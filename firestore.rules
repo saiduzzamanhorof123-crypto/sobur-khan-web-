@@ -1,0 +1,616 @@
+rules_version = '2';
+service cloud.firestore {
+  match /databases/{database}/documents {
+
+    // 1. GLOBAL DEFAULT-DENY CATCH-ALL
+    match /{document=**} {
+      allow read, write: if false;
+    }
+
+    // 2. REUSABLE PRIMITIVES & IDENTITY HELPERS
+    function isSignedIn() {
+      return request.auth != null;
+    }
+
+    function isEmailVerified() {
+      return isSignedIn() && request.auth.token.email_verified == true;
+    }
+
+    function isBootstrappedAdminEmail() {
+      return isEmailVerified() && (
+        request.auth.token.email == 'gpthorof@gmail.com' ||
+        request.auth.token.email == 'sobur@owner.com'
+      );
+    }
+
+    // Cost-safe list helper (never calls exists() or get())
+    function isAdminForList() {
+      return isBootstrappedAdminEmail();
+    }
+
+    // Full admin verification for single-document read/write operations
+    function isAdmin() {
+      return isBootstrappedAdminEmail() || (
+        isEmailVerified() &&
+        exists(/databases/$(database)/documents/admins/$(request.auth.uid))
+      );
+    }
+
+    function isValidId(id) {
+      return id is string && id.size() >= 1 && id.size() <= 128 && id.matches('^[a-zA-Z0-9_\\-]+$');
+    }
+
+    function incoming() {
+      return request.resource.data;
+    }
+
+    function existing() {
+      return resource.data;
+    }
+
+    function isValidStatus(status) {
+      return status is string && status in ['published', 'draft', 'archived'];
+    }
+
+    function isStrLen(val, minLen, maxLen) {
+      return val is string && val.size() >= minLen && val.size() <= maxLen;
+    }
+
+    function isOptionalStr(data, field, maxLen) {
+      return !(field in data) || (data[field] is string && data[field].size() <= maxLen);
+    }
+
+    function isOptionalMap(data, field) {
+      return !(field in data) || data[field] is map;
+    }
+
+    function isOptionalStringList(data, field, maxItems) {
+      return !(field in data) || (
+        data[field] is list &&
+        data[field].size() <= maxItems &&
+        (data[field].size() == 0 || data[field][0] is string)
+      );
+    }
+
+    function isOptionalMapList(data, field, maxItems) {
+      return !(field in data) || (
+        data[field] is list &&
+        data[field].size() <= maxItems &&
+        (data[field].size() == 0 || data[field][0] is map)
+      );
+    }
+
+    // 3. ENTITY VALIDATORS (Strict Keys, Identity Integrity, Type & Size Bounds)
+
+    function isValidAdminRecord(data, uid) {
+      return data.keys().hasAll(['uid', 'email', 'role', 'createdAt']) &&
+        data.keys().hasOnly(['uid', 'email', 'role', 'createdAt']) &&
+        isValidId(data.uid) &&
+        data.uid == uid &&
+        isStrLen(data.email, 3, 200) &&
+        data.role in ['owner', 'admin'] &&
+        isStrLen(data.createdAt, 10, 64);
+    }
+
+    function isValidProfile(data) {
+      return data.keys().hasAll(['id', 'ownerId', 'name', 'title', 'status', 'updatedAt']) &&
+        data.keys().hasOnly([
+          'id', 'ownerId', 'name', 'title', 'tagline', 'shortBio', 'fullBio',
+          'modelingJourney', 'influencerExperience', 'heroImage', 'profileImage',
+          'aboutBgImage', 'stats', 'status', 'updatedAt'
+        ]) &&
+        isValidId(data.id) &&
+        isValidId(data.ownerId) &&
+        data.ownerId == request.auth.uid &&
+        isStrLen(data.name, 1, 160) &&
+        isStrLen(data.title, 1, 200) &&
+        isOptionalStr(data, 'tagline', 500) &&
+        isOptionalStr(data, 'shortBio', 1200) &&
+        isOptionalStr(data, 'fullBio', 6000) &&
+        isOptionalStr(data, 'modelingJourney', 4000) &&
+        isOptionalStr(data, 'influencerExperience', 4000) &&
+        isOptionalStr(data, 'heroImage', 2000) &&
+        isOptionalStr(data, 'profileImage', 2000) &&
+        isOptionalStr(data, 'aboutBgImage', 2000) &&
+        isOptionalMap(data, 'stats') &&
+        isValidStatus(data.status) &&
+        isStrLen(data.updatedAt, 10, 64);
+    }
+
+    function isValidPortfolioProject(data) {
+      return data.keys().hasAll(['id', 'ownerId', 'title', 'category', 'status', 'createdAt', 'updatedAt']) &&
+        data.keys().hasOnly([
+          'id', 'ownerId', 'title', 'subtitle', 'category', 'client', 'year',
+          'coverImage', 'coverImageSettings', 'galleryImages', 'galleryItems',
+          'description', 'credits', 'featured', 'status', 'createdAt', 'updatedAt', 'publishedAt'
+        ]) &&
+        isValidId(data.id) &&
+        isValidId(data.ownerId) &&
+        data.ownerId == request.auth.uid &&
+        isStrLen(data.title, 1, 240) &&
+        isOptionalStr(data, 'subtitle', 300) &&
+        isStrLen(data.category, 1, 80) &&
+        isOptionalStr(data, 'client', 200) &&
+        isOptionalStr(data, 'year', 20) &&
+        isOptionalStr(data, 'coverImage', 2000) &&
+        isOptionalMap(data, 'coverImageSettings') &&
+        isOptionalStringList(data, 'galleryImages', 40) &&
+        isOptionalMapList(data, 'galleryItems', 40) &&
+        isOptionalStr(data, 'description', 4000) &&
+        isOptionalStr(data, 'credits', 1000) &&
+        (!('featured' in data) || data.featured is bool) &&
+        isValidStatus(data.status) &&
+        isStrLen(data.createdAt, 10, 64) &&
+        isStrLen(data.updatedAt, 10, 64) &&
+        isOptionalStr(data, 'publishedAt', 64);
+    }
+
+    function isValidMediaItem(data) {
+      return data.keys().hasAll(['id', 'ownerId', 'title', 'category', 'url', 'status', 'createdAt', 'updatedAt']) &&
+        data.keys().hasOnly([
+          'id', 'ownerId', 'title', 'category', 'url', 'originalUrl', 'description',
+          'featured', 'order', 'fileSize', 'fileType', 'cropMetadata', 'status',
+          'createdAt', 'updatedAt', 'publishedAt'
+        ]) &&
+        isValidId(data.id) &&
+        isValidId(data.ownerId) &&
+        data.ownerId == request.auth.uid &&
+        isStrLen(data.title, 1, 240) &&
+        isStrLen(data.category, 1, 100) &&
+        isStrLen(data.url, 1, 2000) &&
+        isOptionalStr(data, 'originalUrl', 2000) &&
+        isOptionalStr(data, 'description', 2000) &&
+        (!('featured' in data) || data.featured is bool) &&
+        (!('order' in data) || data.order is number) &&
+        isOptionalStr(data, 'fileSize', 64) &&
+        isOptionalStr(data, 'fileType', 64) &&
+        isOptionalMap(data, 'cropMetadata') &&
+        isValidStatus(data.status) &&
+        isStrLen(data.createdAt, 10, 64) &&
+        isStrLen(data.updatedAt, 10, 64) &&
+        isOptionalStr(data, 'publishedAt', 64);
+    }
+
+    function isValidModelingGroup(data) {
+      return data.keys().hasAll(['id', 'ownerId', 'name', 'status', 'createdAt', 'updatedAt']) &&
+        data.keys().hasOnly([
+          'id', 'ownerId', 'name', 'role', 'experience', 'description',
+          'coverImage', 'galleryImages', 'externalLink', 'status', 'createdAt', 'updatedAt', 'publishedAt'
+        ]) &&
+        isValidId(data.id) &&
+        isValidId(data.ownerId) &&
+        data.ownerId == request.auth.uid &&
+        isStrLen(data.name, 1, 240) &&
+        isOptionalStr(data, 'role', 200) &&
+        isOptionalStr(data, 'experience', 2000) &&
+        isOptionalStr(data, 'description', 4000) &&
+        isOptionalStr(data, 'coverImage', 2000) &&
+        isOptionalStringList(data, 'galleryImages', 20) &&
+        isOptionalStr(data, 'externalLink', 1000) &&
+        isValidStatus(data.status) &&
+        isStrLen(data.createdAt, 10, 64) &&
+        isStrLen(data.updatedAt, 10, 64) &&
+        isOptionalStr(data, 'publishedAt', 64);
+    }
+
+    function isValidEventItem(data) {
+      return data.keys().hasAll(['id', 'ownerId', 'title', 'status', 'createdAt', 'updatedAt']) &&
+        data.keys().hasOnly([
+          'id', 'ownerId', 'title', 'role', 'date', 'location', 'description',
+          'coverImage', 'coverImageSettings', 'images', 'galleryItems', 'status',
+          'createdAt', 'updatedAt', 'publishedAt'
+        ]) &&
+        isValidId(data.id) &&
+        isValidId(data.ownerId) &&
+        data.ownerId == request.auth.uid &&
+        isStrLen(data.title, 1, 240) &&
+        isOptionalStr(data, 'role', 200) &&
+        isOptionalStr(data, 'date', 120) &&
+        isOptionalStr(data, 'location', 300) &&
+        isOptionalStr(data, 'description', 4000) &&
+        isOptionalStr(data, 'coverImage', 2000) &&
+        isOptionalMap(data, 'coverImageSettings') &&
+        isOptionalStringList(data, 'images', 40) &&
+        isOptionalMapList(data, 'galleryItems', 40) &&
+        isValidStatus(data.status) &&
+        isStrLen(data.createdAt, 10, 64) &&
+        isStrLen(data.updatedAt, 10, 64) &&
+        isOptionalStr(data, 'publishedAt', 64);
+    }
+
+    function isValidAwardItem(data) {
+      return data.keys().hasAll(['id', 'ownerId', 'name', 'status', 'createdAt', 'updatedAt']) &&
+        data.keys().hasOnly([
+          'id', 'ownerId', 'name', 'organization', 'date', 'description',
+          'trophyImage', 'trophyImageSettings', 'certificateImage', 'certificateImageSettings',
+          'galleryItems', 'status', 'createdAt', 'updatedAt', 'publishedAt'
+        ]) &&
+        isValidId(data.id) &&
+        isValidId(data.ownerId) &&
+        data.ownerId == request.auth.uid &&
+        isStrLen(data.name, 1, 300) &&
+        isOptionalStr(data, 'organization', 300) &&
+        isOptionalStr(data, 'date', 120) &&
+        isOptionalStr(data, 'description', 4000) &&
+        isOptionalStr(data, 'trophyImage', 2000) &&
+        isOptionalMap(data, 'trophyImageSettings') &&
+        isOptionalStr(data, 'certificateImage', 2000) &&
+        isOptionalMap(data, 'certificateImageSettings') &&
+        isOptionalMapList(data, 'galleryItems', 20) &&
+        isValidStatus(data.status) &&
+        isStrLen(data.createdAt, 10, 64) &&
+        isStrLen(data.updatedAt, 10, 64) &&
+        isOptionalStr(data, 'publishedAt', 64);
+    }
+
+    function isValidCourse(data) {
+      return data.keys().hasAll(['id', 'ownerId', 'title', 'status', 'createdAt', 'updatedAt']) &&
+        data.keys().hasOnly([
+          'id', 'ownerId', 'title', 'tier', 'description', 'duration', 'schedule',
+          'location', 'fee', 'feeBdt', 'bdtConfirmed', 'coverImage', 'coverImageSettings',
+          'curriculum', 'maxStudents', 'enrolledCount', 'status', 'createdAt', 'updatedAt', 'publishedAt'
+        ]) &&
+        isValidId(data.id) &&
+        isValidId(data.ownerId) &&
+        data.ownerId == request.auth.uid &&
+        isStrLen(data.title, 1, 240) &&
+        isOptionalStr(data, 'tier', 120) &&
+        isOptionalStr(data, 'description', 4000) &&
+        isOptionalStr(data, 'duration', 160) &&
+        isOptionalStr(data, 'schedule', 240) &&
+        isOptionalStr(data, 'location', 300) &&
+        isOptionalStr(data, 'fee', 120) &&
+        (!('feeBdt' in data) || data.feeBdt is number) &&
+        (!('bdtConfirmed' in data) || data.bdtConfirmed is bool) &&
+        isOptionalStr(data, 'coverImage', 2000) &&
+        isOptionalMap(data, 'coverImageSettings') &&
+        isOptionalStringList(data, 'curriculum', 30) &&
+        (!('maxStudents' in data) || data.maxStudents is number) &&
+        (!('enrolledCount' in data) || data.enrolledCount is number) &&
+        isValidStatus(data.status) &&
+        isStrLen(data.createdAt, 10, 64) &&
+        isStrLen(data.updatedAt, 10, 64) &&
+        isOptionalStr(data, 'publishedAt', 64);
+    }
+
+    function isValidServicePackage(data) {
+      return data.keys().hasAll(['id', 'ownerId', 'name', 'status', 'createdAt', 'updatedAt']) &&
+        data.keys().hasOnly([
+          'id', 'ownerId', 'name', 'category', 'priceBdt', 'priceMaxBdt',
+          'bdtConfirmed', 'description', 'deliverables', 'status', 'createdAt', 'updatedAt'
+        ]) &&
+        isValidId(data.id) &&
+        isValidId(data.ownerId) &&
+        data.ownerId == request.auth.uid &&
+        isStrLen(data.name, 1, 200) &&
+        isOptionalStr(data, 'category', 120) &&
+        (!('priceBdt' in data) || data.priceBdt is number) &&
+        (!('priceMaxBdt' in data) || data.priceMaxBdt is number) &&
+        (!('bdtConfirmed' in data) || data.bdtConfirmed is bool) &&
+        isOptionalStr(data, 'description', 2000) &&
+        isOptionalStringList(data, 'deliverables', 20) &&
+        isValidStatus(data.status) &&
+        isStrLen(data.createdAt, 10, 64) &&
+        isStrLen(data.updatedAt, 10, 64);
+    }
+
+    function isValidImageFrame(data) {
+      return data.keys().hasAll(['id', 'ownerId', 'slot', 'status', 'updatedAt']) &&
+        data.keys().hasOnly([
+          'id', 'ownerId', 'slot', 'label', 'imageUrl', 'originalUrl',
+          'cropMetadata', 'status', 'updatedAt'
+        ]) &&
+        isValidId(data.id) &&
+        isValidId(data.ownerId) &&
+        data.ownerId == request.auth.uid &&
+        isStrLen(data.slot, 1, 80) &&
+        isOptionalStr(data, 'label', 160) &&
+        isOptionalStr(data, 'imageUrl', 2000) &&
+        isOptionalStr(data, 'originalUrl', 2000) &&
+        isOptionalMap(data, 'cropMetadata') &&
+        isValidStatus(data.status) &&
+        isStrLen(data.updatedAt, 10, 64);
+    }
+
+    function isValidSiteConfig(data) {
+      return data.keys().hasAll(['id', 'ownerId', 'updatedAt']) &&
+        data.keys().hasOnly([
+          'id', 'ownerId', 'socialLinks', 'websiteSettings', 'currencySettings',
+          'removedDefaultUrls', 'updatedAt'
+        ]) &&
+        isValidId(data.id) &&
+        isValidId(data.ownerId) &&
+        data.ownerId == request.auth.uid &&
+        isOptionalMap(data, 'socialLinks') &&
+        isOptionalMap(data, 'websiteSettings') &&
+        isOptionalMap(data, 'currencySettings') &&
+        isOptionalStringList(data, 'removedDefaultUrls', 100) &&
+        isStrLen(data.updatedAt, 10, 64);
+    }
+
+    function isValidStudentRegistration(data) {
+      return data.keys().hasAll([
+          'id', 'courseId', 'courseTitle', 'fullName', 'email', 'phone', 'status', 'submittedAt'
+        ]) &&
+        data.keys().hasOnly([
+          'id', 'courseId', 'courseTitle', 'fullName', 'email', 'phone',
+          'age', 'height', 'previousExperience', 'message', 'status',
+          'paymentStatus', 'feeAmountBdt', 'submittedAt'
+        ]) &&
+        isValidId(data.id) &&
+        isValidId(data.courseId) &&
+        isStrLen(data.courseTitle, 1, 240) &&
+        isStrLen(data.fullName, 1, 160) &&
+        isStrLen(data.email, 3, 200) &&
+        isStrLen(data.phone, 5, 40) &&
+        isOptionalStr(data, 'age', 16) &&
+        isOptionalStr(data, 'height', 40) &&
+        isOptionalStr(data, 'previousExperience', 2000) &&
+        isOptionalStr(data, 'message', 2000) &&
+        data.status in ['pending', 'approved', 'rejected'] &&
+        (!('paymentStatus' in data) || data.paymentStatus in ['pending', 'partial', 'paid']) &&
+        (!('feeAmountBdt' in data) || data.feeAmountBdt is number) &&
+        isStrLen(data.submittedAt, 10, 64);
+    }
+
+    function isValidCollaborationInquiry(data) {
+      return data.keys().hasAll([
+          'id', 'companyName', 'contactPerson', 'email', 'collaborationType',
+          'details', 'status', 'submittedAt'
+        ]) &&
+        data.keys().hasOnly([
+          'id', 'companyName', 'contactPerson', 'email', 'phone',
+          'collaborationType', 'budgetRange', 'quotedAmountBdt', 'details',
+          'timeline', 'status', 'submittedAt'
+        ]) &&
+        isValidId(data.id) &&
+        isStrLen(data.companyName, 1, 200) &&
+        isStrLen(data.contactPerson, 1, 160) &&
+        isStrLen(data.email, 3, 200) &&
+        isOptionalStr(data, 'phone', 40) &&
+        isStrLen(data.collaborationType, 1, 120) &&
+        isOptionalStr(data, 'budgetRange', 120) &&
+        (!('quotedAmountBdt' in data) || data.quotedAmountBdt is number) &&
+        isStrLen(data.details, 1, 4000) &&
+        isOptionalStr(data, 'timeline', 160) &&
+        data.status in ['new', 'in_discussion', 'accepted', 'declined'] &&
+        isStrLen(data.submittedAt, 10, 64);
+    }
+
+    function isValidContactMessage(data) {
+      return data.keys().hasAll([
+          'id', 'name', 'email', 'subject', 'message', 'status', 'submittedAt'
+        ]) &&
+        data.keys().hasOnly([
+          'id', 'name', 'email', 'phone', 'subject', 'message', 'status', 'submittedAt'
+        ]) &&
+        isValidId(data.id) &&
+        isStrLen(data.name, 1, 160) &&
+        isStrLen(data.email, 3, 200) &&
+        isOptionalStr(data, 'phone', 40) &&
+        isStrLen(data.subject, 1, 240) &&
+        isStrLen(data.message, 1, 4000) &&
+        data.status in ['unread', 'read', 'replied'] &&
+        isStrLen(data.submittedAt, 10, 64);
+    }
+
+    // 4. CONNECTION HEALTH PROBE (Explicit Single Non-PII Document)
+    match /test/connection {
+      allow get: if true;
+      allow list, write: if false;
+    }
+
+    // 5. ADMIN RBAC COLLECTION
+    match /admins/{userId} {
+      allow get: if isValidId(userId) && isSignedIn() && (request.auth.uid == userId || isAdmin());
+      allow list: if isAdminForList();
+      allow create: if isValidId(userId) && isBootstrappedAdminEmail() &&
+        request.auth.uid == userId &&
+        isValidAdminRecord(incoming(), userId);
+      allow update: if isValidId(userId) && isAdmin() &&
+        isValidAdminRecord(incoming(), userId) &&
+        incoming().uid == existing().uid &&
+        incoming().createdAt == existing().createdAt &&
+        incoming().diff(existing()).affectedKeys().hasOnly(['email', 'role']);
+      allow delete: if isValidId(userId) && isBootstrappedAdminEmail();
+    }
+
+    // 6. PUBLIC PORTFOLIO COLLECTIONS (Published Public Reads / Admin-Only Writes)
+    match /profiles/{profileId} {
+      allow get: if isValidId(profileId) && (existing().status == 'published' || isAdmin());
+      allow list: if resource.data.status == 'published' || isAdminForList();
+      allow create: if isValidId(profileId) && isAdmin() && isValidProfile(incoming());
+      allow update: if isValidId(profileId) && isAdmin() && isValidProfile(incoming()) &&
+        incoming().id == existing().id &&
+        incoming().ownerId == existing().ownerId &&
+        incoming().diff(existing()).affectedKeys().hasOnly([
+          'name', 'title', 'tagline', 'shortBio', 'fullBio', 'modelingJourney',
+          'influencerExperience', 'heroImage', 'profileImage', 'aboutBgImage',
+          'stats', 'status', 'updatedAt'
+        ]);
+      allow delete: if isValidId(profileId) && isAdmin();
+    }
+
+    match /portfolio_projects/{projectId} {
+      allow get: if isValidId(projectId) && (existing().status == 'published' || isAdmin());
+      allow list: if resource.data.status == 'published' || isAdminForList();
+      allow create: if isValidId(projectId) && isAdmin() && isValidPortfolioProject(incoming());
+      allow update: if isValidId(projectId) && isAdmin() && isValidPortfolioProject(incoming()) &&
+        incoming().id == existing().id &&
+        incoming().ownerId == existing().ownerId &&
+        incoming().createdAt == existing().createdAt &&
+        incoming().diff(existing()).affectedKeys().hasOnly([
+          'title', 'subtitle', 'category', 'client', 'year', 'coverImage',
+          'coverImageSettings', 'galleryImages', 'galleryItems', 'description',
+          'credits', 'featured', 'status', 'updatedAt', 'publishedAt'
+        ]);
+      allow delete: if isValidId(projectId) && isAdmin();
+    }
+
+    match /media_library/{mediaId} {
+      allow get: if isValidId(mediaId) && (existing().status == 'published' || isAdmin());
+      allow list: if resource.data.status == 'published' || isAdminForList();
+      allow create: if isValidId(mediaId) && isAdmin() && isValidMediaItem(incoming());
+      allow update: if isValidId(mediaId) && isAdmin() && isValidMediaItem(incoming()) &&
+        incoming().id == existing().id &&
+        incoming().ownerId == existing().ownerId &&
+        incoming().createdAt == existing().createdAt &&
+        incoming().diff(existing()).affectedKeys().hasOnly([
+          'title', 'category', 'url', 'originalUrl', 'description', 'featured',
+          'order', 'fileSize', 'fileType', 'cropMetadata', 'status', 'updatedAt', 'publishedAt'
+        ]);
+      allow delete: if isValidId(mediaId) && isAdmin();
+    }
+
+    match /modeling_groups/{groupId} {
+      allow get: if isValidId(groupId) && (existing().status == 'published' || isAdmin());
+      allow list: if resource.data.status == 'published' || isAdminForList();
+      allow create: if isValidId(groupId) && isAdmin() && isValidModelingGroup(incoming());
+      allow update: if isValidId(groupId) && isAdmin() && isValidModelingGroup(incoming()) &&
+        incoming().id == existing().id &&
+        incoming().ownerId == existing().ownerId &&
+        incoming().createdAt == existing().createdAt &&
+        incoming().diff(existing()).affectedKeys().hasOnly([
+          'name', 'role', 'experience', 'description', 'coverImage',
+          'galleryImages', 'externalLink', 'status', 'updatedAt', 'publishedAt'
+        ]);
+      allow delete: if isValidId(groupId) && isAdmin();
+    }
+
+    match /events/{eventId} {
+      allow get: if isValidId(eventId) && (existing().status == 'published' || isAdmin());
+      allow list: if resource.data.status == 'published' || isAdminForList();
+      allow create: if isValidId(eventId) && isAdmin() && isValidEventItem(incoming());
+      allow update: if isValidId(eventId) && isAdmin() && isValidEventItem(incoming()) &&
+        incoming().id == existing().id &&
+        incoming().ownerId == existing().ownerId &&
+        incoming().createdAt == existing().createdAt &&
+        incoming().diff(existing()).affectedKeys().hasOnly([
+          'title', 'role', 'date', 'location', 'description', 'coverImage',
+          'coverImageSettings', 'images', 'galleryItems', 'status', 'updatedAt', 'publishedAt'
+        ]);
+      allow delete: if isValidId(eventId) && isAdmin();
+    }
+
+    match /awards/{awardId} {
+      allow get: if isValidId(awardId) && (existing().status == 'published' || isAdmin());
+      allow list: if resource.data.status == 'published' || isAdminForList();
+      allow create: if isValidId(awardId) && isAdmin() && isValidAwardItem(incoming());
+      allow update: if isValidId(awardId) && isAdmin() && isValidAwardItem(incoming()) &&
+        incoming().id == existing().id &&
+        incoming().ownerId == existing().ownerId &&
+        incoming().createdAt == existing().createdAt &&
+        incoming().diff(existing()).affectedKeys().hasOnly([
+          'name', 'organization', 'date', 'description', 'trophyImage',
+          'trophyImageSettings', 'certificateImage', 'certificateImageSettings',
+          'galleryItems', 'status', 'updatedAt', 'publishedAt'
+        ]);
+      allow delete: if isValidId(awardId) && isAdmin();
+    }
+
+    match /courses/{courseId} {
+      allow get: if isValidId(courseId) && (existing().status == 'published' || isAdmin());
+      allow list: if resource.data.status == 'published' || isAdminForList();
+      allow create: if isValidId(courseId) && isAdmin() && isValidCourse(incoming());
+      allow update: if isValidId(courseId) && isAdmin() && isValidCourse(incoming()) &&
+        incoming().id == existing().id &&
+        incoming().ownerId == existing().ownerId &&
+        incoming().createdAt == existing().createdAt &&
+        incoming().diff(existing()).affectedKeys().hasOnly([
+          'title', 'tier', 'description', 'duration', 'schedule', 'location',
+          'fee', 'feeBdt', 'bdtConfirmed', 'coverImage', 'coverImageSettings',
+          'curriculum', 'maxStudents', 'enrolledCount', 'status', 'updatedAt', 'publishedAt'
+        ]);
+      allow delete: if isValidId(courseId) && isAdmin();
+    }
+
+    match /service_packages/{packageId} {
+      allow get: if isValidId(packageId) && (existing().status == 'published' || isAdmin());
+      allow list: if resource.data.status == 'published' || isAdminForList();
+      allow create: if isValidId(packageId) && isAdmin() && isValidServicePackage(incoming());
+      allow update: if isValidId(packageId) && isAdmin() && isValidServicePackage(incoming()) &&
+        incoming().id == existing().id &&
+        incoming().ownerId == existing().ownerId &&
+        incoming().createdAt == existing().createdAt &&
+        incoming().diff(existing()).affectedKeys().hasOnly([
+          'name', 'category', 'priceBdt', 'priceMaxBdt', 'bdtConfirmed',
+          'description', 'deliverables', 'status', 'updatedAt'
+        ]);
+      allow delete: if isValidId(packageId) && isAdmin();
+    }
+
+    match /image_frames/{slotId} {
+      allow get: if isValidId(slotId) && (existing().status == 'published' || isAdmin());
+      allow list: if resource.data.status == 'published' || isAdminForList();
+      allow create: if isValidId(slotId) && isAdmin() && isValidImageFrame(incoming());
+      allow update: if isValidId(slotId) && isAdmin() && isValidImageFrame(incoming()) &&
+        incoming().id == existing().id &&
+        incoming().ownerId == existing().ownerId &&
+        incoming().diff(existing()).affectedKeys().hasOnly([
+          'slot', 'label', 'imageUrl', 'originalUrl', 'cropMetadata', 'status', 'updatedAt'
+        ]);
+      allow delete: if isValidId(slotId) && isAdmin();
+    }
+
+    match /site_config/{configId} {
+      allow get: if isValidId(configId);
+      allow list: if isAdminForList();
+      allow create: if isValidId(configId) && isAdmin() && isValidSiteConfig(incoming());
+      allow update: if isValidId(configId) && isAdmin() && isValidSiteConfig(incoming()) &&
+        incoming().id == existing().id &&
+        incoming().ownerId == existing().ownerId &&
+        incoming().diff(existing()).affectedKeys().hasOnly([
+          'socialLinks', 'websiteSettings', 'currencySettings', 'removedDefaultUrls', 'updatedAt'
+        ]);
+      allow delete: if isValidId(configId) && isAdmin();
+    }
+
+    // 7. PII-PROTECTED SUBMISSION COLLECTIONS (Public Create Only / Owner-Only Read & Manage)
+    match /student_registrations/{registrationId} {
+      allow get: if isValidId(registrationId) && isAdmin();
+      allow list: if isAdminForList();
+      allow create: if isValidId(registrationId) &&
+        isValidStudentRegistration(incoming()) &&
+        incoming().status == 'pending';
+      allow update: if isValidId(registrationId) && isAdmin() &&
+        isValidStudentRegistration(incoming()) &&
+        incoming().id == existing().id &&
+        incoming().courseId == existing().courseId &&
+        incoming().submittedAt == existing().submittedAt &&
+        incoming().diff(existing()).affectedKeys().hasOnly([
+          'status', 'paymentStatus', 'feeAmountBdt'
+        ]);
+      allow delete: if isValidId(registrationId) && isAdmin();
+    }
+
+    match /collaboration_inquiries/{inquiryId} {
+      allow get: if isValidId(inquiryId) && isAdmin();
+      allow list: if isAdminForList();
+      allow create: if isValidId(inquiryId) &&
+        isValidCollaborationInquiry(incoming()) &&
+        incoming().status == 'new';
+      allow update: if isValidId(inquiryId) && isAdmin() &&
+        isValidCollaborationInquiry(incoming()) &&
+        incoming().id == existing().id &&
+        incoming().submittedAt == existing().submittedAt &&
+        incoming().diff(existing()).affectedKeys().hasOnly([
+          'status', 'quotedAmountBdt', 'budgetRange'
+        ]);
+      allow delete: if isValidId(inquiryId) && isAdmin();
+    }
+
+    match /contact_messages/{messageId} {
+      allow get: if isValidId(messageId) && isAdmin();
+      allow list: if isAdminForList();
+      allow create: if isValidId(messageId) &&
+        isValidContactMessage(incoming()) &&
+        incoming().status == 'unread';
+      allow update: if isValidId(messageId) && isAdmin() &&
+        isValidContactMessage(incoming()) &&
+        incoming().id == existing().id &&
+        incoming().submittedAt == existing().submittedAt &&
+        incoming().diff(existing()).affectedKeys().hasOnly(['status']);
+      allow delete: if isValidId(messageId) && isAdmin();
+    }
+  }
+}

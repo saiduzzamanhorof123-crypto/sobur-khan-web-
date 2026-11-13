@@ -1,0 +1,389 @@
+{
+  "entities": {
+    "AdminRecord": {
+      "title": "AdminRecord",
+      "description": "Authorized owner/administrator record granting CMS and Firestore write privileges.",
+      "type": "object",
+      "properties": {
+        "uid": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 128,
+          "pattern": "^[a-zA-Z0-9_\\-]+$"
+        },
+        "email": {
+          "type": "string",
+          "format": "email",
+          "minLength": 3,
+          "maxLength": 200
+        },
+        "role": {
+          "type": "string",
+          "enum": ["owner", "admin"]
+        },
+        "createdAt": {
+          "type": "string",
+          "format": "date-time"
+        }
+      },
+      "required": ["uid", "email", "role", "createdAt"]
+    },
+    "Profile": {
+      "title": "Profile",
+      "description": "Public personal brand profile, biography, career stats, and hero/about imagery.",
+      "type": "object",
+      "properties": {
+        "id": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 128,
+          "pattern": "^[a-zA-Z0-9_\\-]+$"
+        },
+        "ownerId": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 128,
+          "pattern": "^[a-zA-Z0-9_\\-]+$"
+        },
+        "name": { "type": "string", "minLength": 1, "maxLength": 160 },
+        "title": { "type": "string", "minLength": 1, "maxLength": 200 },
+        "tagline": { "type": "string", "maxLength": 500 },
+        "shortBio": { "type": "string", "maxLength": 1200 },
+        "fullBio": { "type": "string", "maxLength": 6000 },
+        "modelingJourney": { "type": "string", "maxLength": 4000 },
+        "influencerExperience": { "type": "string", "maxLength": 4000 },
+        "heroImage": { "type": "string", "maxLength": 2000 },
+        "profileImage": { "type": "string", "maxLength": 2000 },
+        "aboutBgImage": { "type": "string", "maxLength": 2000 },
+        "stats": { "type": "object" },
+        "status": { "type": "string", "enum": ["published", "draft", "archived"] },
+        "updatedAt": { "type": "string", "format": "date-time" }
+      },
+      "required": ["id", "ownerId", "name", "title", "status", "updatedAt"]
+    },
+    "PortfolioProject": {
+      "title": "PortfolioProject",
+      "description": "High-fashion modeling portfolio showcase project with independent cover and gallery items.",
+      "type": "object",
+      "properties": {
+        "id": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 128,
+          "pattern": "^[a-zA-Z0-9_\\-]+$"
+        },
+        "ownerId": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 128,
+          "pattern": "^[a-zA-Z0-9_\\-]+$"
+        },
+        "title": { "type": "string", "minLength": 1, "maxLength": 240 },
+        "subtitle": { "type": "string", "maxLength": 300 },
+        "category": { "type": "string", "minLength": 1, "maxLength": 80 },
+        "client": { "type": "string", "maxLength": 200 },
+        "year": { "type": "string", "maxLength": 20 },
+        "coverImage": { "type": "string", "maxLength": 2000 },
+        "coverImageSettings": { "type": "object" },
+        "galleryImages": { "type": "array" },
+        "galleryItems": { "type": "array" },
+        "description": { "type": "string", "maxLength": 4000 },
+        "credits": { "type": "string", "maxLength": 1000 },
+        "featured": { "type": "boolean" },
+        "status": { "type": "string", "enum": ["published", "draft", "archived"] },
+        "createdAt": { "type": "string", "format": "date-time" },
+        "updatedAt": { "type": "string", "format": "date-time" }
+      },
+      "required": ["id", "ownerId", "title", "category", "status", "createdAt", "updatedAt"]
+    },
+    "MediaItem": {
+      "title": "MediaItem",
+      "description": "Published or draft gallery photograph entry with independent crop and display metadata.",
+      "type": "object",
+      "properties": {
+        "id": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 128,
+          "pattern": "^[a-zA-Z0-9_\\-]+$"
+        },
+        "ownerId": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 128,
+          "pattern": "^[a-zA-Z0-9_\\-]+$"
+        },
+        "title": { "type": "string", "minLength": 1, "maxLength": 240 },
+        "category": { "type": "string", "minLength": 1, "maxLength": 100 },
+        "url": { "type": "string", "minLength": 1, "maxLength": 2000 },
+        "originalUrl": { "type": "string", "maxLength": 2000 },
+        "description": { "type": "string", "maxLength": 2000 },
+        "featured": { "type": "boolean" },
+        "order": { "type": "number" },
+        "cropMetadata": { "type": "object" },
+        "status": { "type": "string", "enum": ["published", "draft", "archived"] },
+        "createdAt": { "type": "string", "format": "date-time" },
+        "updatedAt": { "type": "string", "format": "date-time" }
+      },
+      "required": ["id", "ownerId", "title", "category", "url", "status", "createdAt", "updatedAt"]
+    },
+    "ModelingGroup": {
+      "title": "ModelingGroup",
+      "description": "Modeling group or runway collective affiliation record.",
+      "type": "object",
+      "properties": {
+        "id": { "type": "string", "minLength": 1, "maxLength": 128, "pattern": "^[a-zA-Z0-9_\\-]+$" },
+        "ownerId": { "type": "string", "minLength": 1, "maxLength": 128, "pattern": "^[a-zA-Z0-9_\\-]+$" },
+        "name": { "type": "string", "minLength": 1, "maxLength": 240 },
+        "role": { "type": "string", "maxLength": 200 },
+        "experience": { "type": "string", "maxLength": 2000 },
+        "description": { "type": "string", "maxLength": 4000 },
+        "coverImage": { "type": "string", "maxLength": 2000 },
+        "externalLink": { "type": "string", "maxLength": 1000 },
+        "status": { "type": "string", "enum": ["published", "draft", "archived"] },
+        "createdAt": { "type": "string", "format": "date-time" },
+        "updatedAt": { "type": "string", "format": "date-time" }
+      },
+      "required": ["id", "ownerId", "name", "status", "createdAt", "updatedAt"]
+    },
+    "EventItem": {
+      "title": "EventItem",
+      "description": "Runway event, gala, or brand show appearance with cover and event gallery items.",
+      "type": "object",
+      "properties": {
+        "id": { "type": "string", "minLength": 1, "maxLength": 128, "pattern": "^[a-zA-Z0-9_\\-]+$" },
+        "ownerId": { "type": "string", "minLength": 1, "maxLength": 128, "pattern": "^[a-zA-Z0-9_\\-]+$" },
+        "title": { "type": "string", "minLength": 1, "maxLength": 240 },
+        "role": { "type": "string", "maxLength": 200 },
+        "date": { "type": "string", "maxLength": 120 },
+        "location": { "type": "string", "maxLength": 300 },
+        "description": { "type": "string", "maxLength": 4000 },
+        "coverImage": { "type": "string", "maxLength": 2000 },
+        "coverImageSettings": { "type": "object" },
+        "images": { "type": "array" },
+        "galleryItems": { "type": "array" },
+        "status": { "type": "string", "enum": ["published", "draft", "archived"] },
+        "createdAt": { "type": "string", "format": "date-time" },
+        "updatedAt": { "type": "string", "format": "date-time" }
+      },
+      "required": ["id", "ownerId", "title", "status", "createdAt", "updatedAt"]
+    },
+    "AwardItem": {
+      "title": "AwardItem",
+      "description": "Honor, recognition, trophy photo, and legible Fit-to-Frame certificate photo.",
+      "type": "object",
+      "properties": {
+        "id": { "type": "string", "minLength": 1, "maxLength": 128, "pattern": "^[a-zA-Z0-9_\\-]+$" },
+        "ownerId": { "type": "string", "minLength": 1, "maxLength": 128, "pattern": "^[a-zA-Z0-9_\\-]+$" },
+        "name": { "type": "string", "minLength": 1, "maxLength": 300 },
+        "organization": { "type": "string", "maxLength": 300 },
+        "date": { "type": "string", "maxLength": 120 },
+        "description": { "type": "string", "maxLength": 4000 },
+        "trophyImage": { "type": "string", "maxLength": 2000 },
+        "trophyImageSettings": { "type": "object" },
+        "certificateImage": { "type": "string", "maxLength": 2000 },
+        "certificateImageSettings": { "type": "object" },
+        "galleryItems": { "type": "array" },
+        "status": { "type": "string", "enum": ["published", "draft", "archived"] },
+        "createdAt": { "type": "string", "format": "date-time" },
+        "updatedAt": { "type": "string", "format": "date-time" }
+      },
+      "required": ["id", "ownerId", "name", "status", "createdAt", "updatedAt"]
+    },
+    "ModelingCourse": {
+      "title": "ModelingCourse",
+      "description": "Offline modeling training course with BDT pricing and independent cover image settings.",
+      "type": "object",
+      "properties": {
+        "id": { "type": "string", "minLength": 1, "maxLength": 128, "pattern": "^[a-zA-Z0-9_\\-]+$" },
+        "ownerId": { "type": "string", "minLength": 1, "maxLength": 128, "pattern": "^[a-zA-Z0-9_\\-]+$" },
+        "title": { "type": "string", "minLength": 1, "maxLength": 240 },
+        "tier": { "type": "string", "maxLength": 120 },
+        "description": { "type": "string", "maxLength": 4000 },
+        "duration": { "type": "string", "maxLength": 160 },
+        "schedule": { "type": "string", "maxLength": 240 },
+        "location": { "type": "string", "maxLength": 300 },
+        "fee": { "type": "string", "maxLength": 120 },
+        "feeBdt": { "type": "number" },
+        "bdtConfirmed": { "type": "boolean" },
+        "coverImage": { "type": "string", "maxLength": 2000 },
+        "coverImageSettings": { "type": "object" },
+        "curriculum": { "type": "array" },
+        "maxStudents": { "type": "number" },
+        "enrolledCount": { "type": "number" },
+        "status": { "type": "string", "enum": ["published", "draft", "archived"] },
+        "createdAt": { "type": "string", "format": "date-time" },
+        "updatedAt": { "type": "string", "format": "date-time" }
+      },
+      "required": ["id", "ownerId", "title", "status", "createdAt", "updatedAt"]
+    },
+    "ServicePackage": {
+      "title": "ServicePackage",
+      "description": "Commercial endorsement or collaboration pricing tier in BDT.",
+      "type": "object",
+      "properties": {
+        "id": { "type": "string", "minLength": 1, "maxLength": 128, "pattern": "^[a-zA-Z0-9_\\-]+$" },
+        "ownerId": { "type": "string", "minLength": 1, "maxLength": 128, "pattern": "^[a-zA-Z0-9_\\-]+$" },
+        "name": { "type": "string", "minLength": 1, "maxLength": 200 },
+        "category": { "type": "string", "maxLength": 120 },
+        "priceBdt": { "type": "number" },
+        "priceMaxBdt": { "type": "number" },
+        "bdtConfirmed": { "type": "boolean" },
+        "description": { "type": "string", "maxLength": 2000 },
+        "deliverables": { "type": "array" },
+        "status": { "type": "string", "enum": ["published", "draft", "archived"] },
+        "createdAt": { "type": "string", "format": "date-time" },
+        "updatedAt": { "type": "string", "format": "date-time" }
+      },
+      "required": ["id", "ownerId", "name", "status", "createdAt", "updatedAt"]
+    },
+    "FrameImageConfig": {
+      "title": "FrameImageConfig",
+      "description": "Independent website slot frame configuration.",
+      "type": "object",
+      "properties": {
+        "id": { "type": "string", "minLength": 1, "maxLength": 128, "pattern": "^[a-zA-Z0-9_\\-]+$" },
+        "ownerId": { "type": "string", "minLength": 1, "maxLength": 128, "pattern": "^[a-zA-Z0-9_\\-]+$" },
+        "slot": { "type": "string", "minLength": 1, "maxLength": 80 },
+        "label": { "type": "string", "maxLength": 160 },
+        "imageUrl": { "type": "string", "maxLength": 2000 },
+        "originalUrl": { "type": "string", "maxLength": 2000 },
+        "cropMetadata": { "type": "object" },
+        "status": { "type": "string", "enum": ["published", "draft", "archived"] },
+        "updatedAt": { "type": "string", "format": "date-time" }
+      },
+      "required": ["id", "ownerId", "slot", "status", "updatedAt"]
+    },
+    "SiteConfig": {
+      "title": "SiteConfig",
+      "description": "Public website settings, social links, BDT currency preferences, and deleted default asset list.",
+      "type": "object",
+      "properties": {
+        "id": { "type": "string", "minLength": 1, "maxLength": 128, "pattern": "^[a-zA-Z0-9_\\-]+$" },
+        "ownerId": { "type": "string", "minLength": 1, "maxLength": 128, "pattern": "^[a-zA-Z0-9_\\-]+$" },
+        "socialLinks": { "type": "object" },
+        "websiteSettings": { "type": "object" },
+        "currencySettings": { "type": "object" },
+        "removedDefaultUrls": { "type": "array" },
+        "updatedAt": { "type": "string", "format": "date-time" }
+      },
+      "required": ["id", "ownerId", "updatedAt"]
+    },
+    "StudentRegistration": {
+      "title": "StudentRegistration",
+      "description": "PII-protected offline academy course enrollment application.",
+      "type": "object",
+      "properties": {
+        "id": { "type": "string", "minLength": 1, "maxLength": 128, "pattern": "^[a-zA-Z0-9_\\-]+$" },
+        "courseId": { "type": "string", "minLength": 1, "maxLength": 128, "pattern": "^[a-zA-Z0-9_\\-]+$" },
+        "courseTitle": { "type": "string", "minLength": 1, "maxLength": 240 },
+        "fullName": { "type": "string", "minLength": 1, "maxLength": 160 },
+        "email": { "type": "string", "format": "email", "minLength": 3, "maxLength": 200 },
+        "phone": { "type": "string", "minLength": 5, "maxLength": 40 },
+        "age": { "type": "string", "maxLength": 16 },
+        "height": { "type": "string", "maxLength": 40 },
+        "previousExperience": { "type": "string", "maxLength": 2000 },
+        "message": { "type": "string", "maxLength": 2000 },
+        "status": { "type": "string", "enum": ["pending", "approved", "rejected"] },
+        "paymentStatus": { "type": "string", "enum": ["pending", "partial", "paid"] },
+        "feeAmountBdt": { "type": "number" },
+        "submittedAt": { "type": "string", "format": "date-time" }
+      },
+      "required": ["id", "courseId", "courseTitle", "fullName", "email", "phone", "status", "submittedAt"]
+    },
+    "CollaborationInquiry": {
+      "title": "CollaborationInquiry",
+      "description": "PII-protected brand collaboration and endorsement proposal.",
+      "type": "object",
+      "properties": {
+        "id": { "type": "string", "minLength": 1, "maxLength": 128, "pattern": "^[a-zA-Z0-9_\\-]+$" },
+        "companyName": { "type": "string", "minLength": 1, "maxLength": 200 },
+        "contactPerson": { "type": "string", "minLength": 1, "maxLength": 160 },
+        "email": { "type": "string", "format": "email", "minLength": 3, "maxLength": 200 },
+        "phone": { "type": "string", "maxLength": 40 },
+        "collaborationType": { "type": "string", "minLength": 1, "maxLength": 120 },
+        "budgetRange": { "type": "string", "maxLength": 120 },
+        "quotedAmountBdt": { "type": "number" },
+        "details": { "type": "string", "minLength": 1, "maxLength": 4000 },
+        "timeline": { "type": "string", "maxLength": 160 },
+        "status": { "type": "string", "enum": ["new", "in_discussion", "accepted", "declined"] },
+        "submittedAt": { "type": "string", "format": "date-time" }
+      },
+      "required": ["id", "companyName", "contactPerson", "email", "collaborationType", "details", "status", "submittedAt"]
+    },
+    "ContactMessage": {
+      "title": "ContactMessage",
+      "description": "PII-protected general visitor contact message.",
+      "type": "object",
+      "properties": {
+        "id": { "type": "string", "minLength": 1, "maxLength": 128, "pattern": "^[a-zA-Z0-9_\\-]+$" },
+        "name": { "type": "string", "minLength": 1, "maxLength": 160 },
+        "email": { "type": "string", "format": "email", "minLength": 3, "maxLength": 200 },
+        "phone": { "type": "string", "maxLength": 40 },
+        "subject": { "type": "string", "minLength": 1, "maxLength": 240 },
+        "message": { "type": "string", "minLength": 1, "maxLength": 4000 },
+        "status": { "type": "string", "enum": ["unread", "read", "replied"] },
+        "submittedAt": { "type": "string", "format": "date-time" }
+      },
+      "required": ["id", "name", "email", "subject", "message", "status", "submittedAt"]
+    }
+  },
+  "firestore": {
+    "/admins/{userId}": {
+      "schema": { "$ref": "#/entities/AdminRecord" },
+      "description": "Authorized owner/admin identities for RBAC validation."
+    },
+    "/profiles/{profileId}": {
+      "schema": { "$ref": "#/entities/Profile" },
+      "description": "Public brand profile document."
+    },
+    "/portfolio_projects/{projectId}": {
+      "schema": { "$ref": "#/entities/PortfolioProject" },
+      "description": "Portfolio works showcase items."
+    },
+    "/media_library/{mediaId}": {
+      "schema": { "$ref": "#/entities/MediaItem" },
+      "description": "Gallery photo assets and metadata."
+    },
+    "/modeling_groups/{groupId}": {
+      "schema": { "$ref": "#/entities/ModelingGroup" },
+      "description": "Modeling group and collective affiliations."
+    },
+    "/events/{eventId}": {
+      "schema": { "$ref": "#/entities/EventItem" },
+      "description": "Runway events and show appearances."
+    },
+    "/awards/{awardId}": {
+      "schema": { "$ref": "#/entities/AwardItem" },
+      "description": "Honors, trophies, and full award certificates."
+    },
+    "/courses/{courseId}": {
+      "schema": { "$ref": "#/entities/ModelingCourse" },
+      "description": "Offline modeling academy courses."
+    },
+    "/service_packages/{packageId}": {
+      "schema": { "$ref": "#/entities/ServicePackage" },
+      "description": "BDT collaboration service packages."
+    },
+    "/image_frames/{slotId}": {
+      "schema": { "$ref": "#/entities/FrameImageConfig" },
+      "description": "Website slot image frame settings."
+    },
+    "/site_config/{configId}": {
+      "schema": { "$ref": "#/entities/SiteConfig" },
+      "description": "Public site configuration, social links, currency settings, and removed defaults."
+    },
+    "/student_registrations/{registrationId}": {
+      "schema": { "$ref": "#/entities/StudentRegistration" },
+      "description": "PII-protected academy course registrations (owner read/update/delete only)."
+    },
+    "/collaboration_inquiries/{inquiryId}": {
+      "schema": { "$ref": "#/entities/CollaborationInquiry" },
+      "description": "PII-protected brand collaboration proposals (owner read/update/delete only)."
+    },
+    "/contact_messages/{messageId}": {
+      "schema": { "$ref": "#/entities/ContactMessage" },
+      "description": "PII-protected contact inquiries (owner read/update/delete only)."
+    }
+  }
+}
